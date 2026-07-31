@@ -77,6 +77,14 @@
                                                                       "glossary",
                                                                       "api-reference"
                                                       ]
+                                        },
+                                        {
+                                          "group": "Day Unlocks",
+                                          "pages": [
+                                            "untitled-page-3",
+                                            "untitled-page-2",
+                                            "untitled-page-4"
+                                          ]
                                         }
                             ]
                   }
