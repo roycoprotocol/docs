@@ -1,0 +1,77 @@
+---
+title: "Fixed-Rate Senior Tranches"
+description: "How Royco Day accounts for a fixed-rate Senior coupon with Junior underwriting and liquidity-provider participation."
+---
+
+Royco Day can deploy a **fixed-rate Senior tranche** instead of a floating Senior yield-share model. The fixed-rate accountant accrues a configured Senior coupon while preserving Day's Junior first-loss coverage, liquidity-provider tranche, NAV conservation, and fixed-term state machine.
+
+<Warning>
+  A fixed-rate coupon is an accounting target, not a promise of a fixed return or principal recovery. Payment depends on the collateral mark, the available Junior buffer, and the market state. If the collateral gain and Junior buffer cannot fund the full coupon, the unpaid amount is forgiven at settlement and is not carried forward.
+</Warning>
+
+## Tranche roles
+
+- **Senior (ST):** receives the configured coupon on its committed effective NAV. Senior capital remains subject to the market's coverage, liquidity, oracle, and redemption rules.
+- **Junior (JT):** provides the first-loss buffer. It absorbs collateral losses before Senior and can front a coupon shortfall. Any amount fronted by JT is recorded as JT impermanent loss and is the first claim on later collateral recovery. After the coupon and LPT premium, JT is the residual claimant on excess yield.
+- **Liquidity Provider (LPT):** continues to provide secondary liquidity for Senior shares. It receives a liquidity premium from excess yield, sized by the LPT Yield Distribution Model (YDM) and capped by the market configuration.
+
+## Coupon accrual
+
+For each settlement window, the coupon due is calculated as:
+
+```
+Coupon due = committed ST effective NAV
+             × fixed rate per second
+             × elapsed seconds
+```
+
+The rate is stored in WAD precision and accrues linearly within the window. The coupon is settled only when a synchronization observes a collateral NAV movement. A synchronization with no NAV movement does not settle a coupon or open a new coupon window.
+
+The coupon base is the committed Senior effective NAV at the last accounting checkpoint. Senior capital that exits before the next settlement is not included in that settlement's coupon base, and the Junior buffer is not charged for capital that has already left.
+
+## Settlement waterfall
+
+The fixed-rate accountant applies the following order whenever a collateral NAV movement is priced:
+
+1. **Apply collateral PnL.** On a loss, JT absorbs the loss first. Any loss beyond the remaining JT buffer reaches ST.
+2. **Restore prior JT impermanent loss.** On a gain, the gain first repays any tracked JT impermanent loss. This is restoration rather than yield and is not fee-bearing.
+3. **Settle the Senior coupon.** The remaining gain funds the coupon. If the gain is insufficient, the remaining JT buffer can fund the shortfall; that funded shortfall is added to JT impermanent loss. Any amount still unfunded is forgiven for that settlement window.
+4. **Distribute excess yield.** After restoration and the coupon, the LPT liquidity premium is carved from the remaining gain using the LPT YDM and its maximum-share cap. The remaining excess is credited to JT.
+5. **Apply fees and commit state.** Protocol fees are calculated on fee-eligible coupon or excess-yield amounts, and the resulting Senior and Junior effective NAVs must still equal the collateral NAV.
+
+The LPT premium is minted as Senior shares for the LPT, so the premium remains a Senior claim and does not add new Senior exposure to the market.
+
+## Fixed-term recovery state
+
+The fixed-rate accountant uses the same recovery state machine as other Day markets. A market can enter **FIXED_TERM** when a non-dust JT impermanent loss is recorded while coverage remains below the liquidation threshold and any post-deployment grace period has ended.
+
+While a market is in FIXED_TERM:
+
+- Senior and Junior deposits and redemptions are disabled.
+- LPT redemptions are disabled so secondary liquidity remains in place.
+- LPT deposits remain available; a multi-asset LPT entry can use the quote leg while Senior entry is disabled.
+- Excess-yield distribution is paused: no LPT liquidity premium or JT/LPT excess-yield fee is paid while the tracked JT impermanent loss remains outstanding. A fee on a Senior coupon actually paid may still accrue.
+- Adaptive YDMs do not adapt based on the recovery state's underlying PnL.
+
+The market returns to **PERPETUAL** when JT impermanent loss is repaid to within the dust tolerance. It is also forced back to PERPETUAL when the fixed term expires, coverage breaches the liquidation threshold, or the Junior buffer is exhausted. On a forced transition, the remaining JT impermanent-loss claim is reset. A market configured with a zero fixed-term duration remains perpetually PERPETUAL.
+
+## Configuration and administration
+
+The fixed-rate accountant is initialized with:
+
+| Parameter | Purpose |
+| --- | --- |
+| `stFixedRatePerSecondWAD` | Senior coupon rate per second, scaled to WAD precision. |
+| `lptYDM` | YDM that prices the LPT liquidity premium from excess yield. |
+| `maxLPTYieldShareWAD` | Maximum share of excess yield that can be paid to the LPT; it cannot exceed 100%. |
+| Standard Day parameters | Coverage, liquidation, dust, fixed-term, oracle, and protocol-fee controls inherited from the base accountant. |
+
+The fixed-rate flavor replaces the floating JT risk-premium YDM with the configured Senior coupon. The LPT YDM remains active for excess yield. Its initialization requires the legacy JT protocol-fee field to be zero; JT's fee on residual excess yield is configured through the excess-yield fee field instead.
+
+Designated administrators can update the Senior rate, LPT YDM, and maximum LPT yield share. Updates synchronize accounting first. Because a rate update is applied across the current in-flight accrual window, operators should update the rate immediately after a coupon settlement when possible.
+
+For the implementation, see [Royco Day PR #34](https://github.com/roycoprotocol/royco-day/pull/34).
+
+---
+
+_This document is provided for informational purposes only and does not constitute investment advice, a solicitation, or an offer to sell any securities or financial instruments. Participation in Royco products involves risk, including the potential loss of all capital deployed. Prospective participants should conduct their own independent due diligence and consult with qualified legal, financial, and tax advisors before making any investment decisions._
