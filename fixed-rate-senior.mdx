@@ -11,11 +11,15 @@ Royco Day markets can use a fixed rate to calculate a payment for the Senior tra
 - **Junior (JT):** absorbs losses before Senior and may cover a coupon shortfall. If Junior covers a loss or shortfall, future gains first go toward restoring that amount. Junior receives yield left after the coupon and LPT premium.
 - **Liquidity Provider Tranche (LPT):** provides secondary liquidity for Senior shares. It may receive a liquidity premium from gains left after the Senior coupon. The market's liquidity settings determine the premium.
 
-## When the coupon is calculated
+## How the Senior coupon accrues
 
-The coupon builds over time. The market settles it when an update records a change in collateral value. If the recorded value does not change, the coupon is not settled and its calculation period stays open.
+Each second, the coupon amount grows based on the Senior value recorded at the last accounting checkpoint. At the next accounting update that records a change in collateral value, the market calculates and settles the amount:
 
-The amount is based on the fixed rate, the time since the last settlement, and the Senior value recorded by the market.
+```
+Coupon due = Senior value at last checkpoint × fixed rate per second × elapsed seconds
+```
+
+If an update records no change, no settlement occurs; time keeps accruing from the same checkpoint. Senior capital withdrawn before settlement is excluded from the coupon base. This calculation sets the amount due, not a guaranteed payment; the settlement order below determines how much the market can pay. Any unpaid amount is cleared rather than carried forward.
 
 ## How gains and losses are handled
 
