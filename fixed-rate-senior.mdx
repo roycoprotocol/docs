@@ -29,6 +29,12 @@ When the market records a loss, Junior absorbs it first. Losses beyond the Junio
 
 When the market records a gain, it first restores recorded Junior losses, then pays the Senior coupon. If the gain is not enough, the remaining Junior coverage may cover part of the coupon. Any gain left after that can pay the SLP premium, and Junior receives the rest.
 
+### Example: a $10 coupon
+
+After restoring any earlier Junior losses, assume $4 in gains remain and Junior has $20 of coverage. The market uses $4 in gains and $6 from Junior to pay the full $10 coupon. The $6 taken from Junior is recorded as a Junior loss. If the market's settings and entry thresholds permit an Observation Period, future gains first restore that $6 to Junior.
+
+If Junior has only $3 of coverage remaining, the market pays $7 of the coupon: $4 from gains and $3 from Junior. The unpaid $3 is canceled; it is not carried forward. Because Junior's remaining coverage is exhausted, the contract clears the Junior loss instead of entering an Observation Period to restore it.
+
 The SLP premium is paid in Senior shares, so it does not increase Senior exposure to the market.
 
 ## Observation Period
