@@ -1,6 +1,6 @@
 ---
 title: "Fixed-Rate Senior Tranche"
-description: "How the fixed Senior rate works and how it affects Junior and the Liquidity Provider Tranche."
+description: "How the fixed Senior rate works and how it affects Junior and the Senior Liquidity Provider."
 ---
 
 Royco Day markets can use a fixed rate to calculate a payment for the Senior tranche, called a **coupon**. The rate determines how the coupon is calculated, but does not guarantee payment. Payment depends on market gains and available Junior coverage.
@@ -8,40 +8,42 @@ Royco Day markets can use a fixed rate to calculate a payment for the Senior tra
 ## How each tranche works
 
 - **Senior (ST):** has a coupon calculated using the market's fixed rate. Deposits and withdrawals still follow the market's coverage, liquidity, and redemption rules.
-- **Junior (JT):** absorbs losses before Senior and may cover a coupon shortfall. If Junior covers a loss or shortfall, future gains first go toward restoring that amount. Junior receives yield left after the coupon and LPT premium.
-- **Liquidity Provider Tranche (LPT):** provides secondary liquidity for Senior shares. It may receive a liquidity premium from gains left after the Senior coupon. The market's liquidity settings determine the premium.
+- **Junior (JT):** absorbs losses before Senior and may cover a coupon shortfall. If Junior covers a loss or shortfall, future gains first go toward restoring that amount. Junior receives yield left after the coupon and SLP premium.
+- **Senior Liquidity Provider (SLP):** provides secondary liquidity for Senior shares. It may receive a liquidity premium from gains left after the Senior coupon. The market's liquidity settings determine the premium.
 
 ## How the Senior coupon accrues
 
-Each second, the coupon amount grows based on the Senior value recorded at the last accounting checkpoint. At the next accounting update that records a change in collateral value, the market calculates and settles the amount:
+At each accounting update that records a change in collateral value, the market calculates the Senior coupon due:
 
 ```
-Coupon due = Senior value at last checkpoint × fixed rate per second × elapsed seconds
+Coupon due = Senior value at last accounting checkpoint × fixed rate per second × elapsed seconds
 ```
 
-If an update records no change, no settlement occurs; time keeps accruing from the same checkpoint. Senior capital withdrawn before settlement is excluded from the coupon base. This calculation sets the amount due, not a guaranteed payment; the settlement order below determines how much the market can pay. Any unpaid amount is cleared rather than carried forward.
+The calculation window is the time since the last accounting checkpoint—the last time the market recorded a Senior value for the coupon. It has no set length. If an update records no change in collateral value, it does not settle the coupon or reset the window; accrual continues from the same checkpoint. For example, if the coupon was last settled on Monday and a Tuesday update records no change, the clock keeps running. If Wednesday's update records a change, the calculation covers the two days since Monday. Wednesday becomes the checkpoint for the next calculation window.
+
+This coupon calculation window is separate from the Observation Period below, which is a configured recovery window after a Junior loss. The formula gives the amount due, not a guaranteed payment. Gains first restore any prior Junior losses; remaining gains and Junior's remaining coverage can fund the coupon. If they cannot cover it in full, the shortfall is not owed later. Senior capital withdrawn before settlement is excluded from the coupon base.
 
 ## How gains and losses are handled
 
-When the market records a loss, Junior absorbs it first. Losses beyond the Junior coverage affect Senior. If Junior covers a coupon shortfall, that amount is recorded as a Junior loss and future gains first go toward restoring it. Any coupon the market cannot pay is cleared at that update and does not carry forward.
+When the market records a loss, Junior absorbs it first. Losses beyond the Junior coverage affect Senior. If Junior covers a coupon shortfall, that amount is recorded as a Junior loss and future gains first go toward restoring it. Any coupon still unpaid after the update is not owed later.
 
-When the market records a gain, it first restores recorded Junior losses, then pays the Senior coupon. If the gain is not enough, the remaining Junior coverage may cover part of the coupon. Any gain left after that can pay the LPT premium, and Junior receives the rest.
+When the market records a gain, it first restores recorded Junior losses, then pays the Senior coupon. If the gain is not enough, the remaining Junior coverage may cover part of the coupon. Any gain left after that can pay the SLP premium, and Junior receives the rest.
 
-The LPT premium is paid in Senior shares, so it does not increase Senior exposure to the market.
+The SLP premium is paid in Senior shares, so it does not increase Senior exposure to the market.
 
-## Recovery period
+## Observation Period
 
-A market may enter a temporary recovery period after Junior absorbs a loss, if it has not reached its liquidation threshold. This period is called **Fixed Term** in the market settings.
+A market may enter an **Observation Period** after Junior absorbs a loss, if it has not reached its liquidation threshold. This gives the market time to recover. Its duration is set in the market settings.
 
-During the recovery period, Senior and Junior deposits and withdrawals pause. LPT withdrawals also pause, but LPT deposits remain available. Gains first restore recorded Junior losses, so the regular LPT premium and related excess-yield fees pause. A fee on a Senior coupon that is paid may still apply.
+During the Observation Period, Senior and Junior deposits and withdrawals pause. SLP withdrawals also pause, but SLP deposits remain available. Gains first restore recorded Junior losses, so the regular SLP premium and related excess-yield fees pause. A fee on a Senior coupon that is paid may still apply.
 
-The market returns to normal when the Junior loss is restored. It also returns to normal if the recovery period ends, the market reaches its liquidation threshold, or the Junior buffer is exhausted. If any Junior loss remains at that point, it is cleared. Markets with no Fixed Term duration do not enter this recovery period.
+The Observation Period ends when the Junior loss is restored, its configured duration expires, the market reaches its liquidation threshold, or the Junior buffer is exhausted. If it ends before recovery, any remaining Junior loss is written off and cannot be recovered from later gains. Markets with no Observation Period duration do not enter one.
 
 ## Market settings
 
-Each market sets the Senior rate, the model and cap used to calculate the LPT premium, and an administrator who can update these settings. A rate change applies to the coupon period already in progress, so it is best made just after a coupon is settled.
+Each market sets the Senior rate, the model and cap used to calculate the SLP premium, and an administrator who can update these settings. A rate change applies to the coupon calculation window already in progress, so it is best made just after a coupon is settled.
 
-In a fixed-rate market, the Senior coupon takes the place of the variable risk premium used in other Day markets. The LPT premium still depends on the market's liquidity settings, and Junior receives any yield left over.
+In a fixed-rate market, the Senior coupon takes the place of the variable risk premium used in other Day markets. The SLP premium still depends on the market's liquidity settings, and Junior receives any yield left over.
 
 For implementation details, see [Royco Day PR #34](https://github.com/roycoprotocol/royco-day/pull/34).
 
